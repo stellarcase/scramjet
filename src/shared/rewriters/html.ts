@@ -64,7 +64,7 @@ export function rewriteHtml(
 	}
 
 	return render(handler.root, {
-		encodeEntities: "named",
+		encodeEntities: true,
 		decodeEntities: false,
 	});
 }
@@ -136,6 +136,7 @@ export const htmlRules: {
 			if (value.startsWith("blob:")) {
 				return unrewriteBlob(value);
 			}
+
 			return rewriteUrl(value, meta);
 		},
 		src: ["video", "audio"],
@@ -288,6 +289,7 @@ export function rewriteSrcset(srcset: string, meta: URLMeta) {
 	const rewrittenSources = sources.map((source) => {
 		const [url, ...descriptors] = source.split(/\s+/);
 		const rewrittenUrl = rewriteUrl(url.trim(), meta);
+
 		return descriptors.length > 0
 			? `${rewrittenUrl} ${descriptors.join(" ")}`
 			: rewrittenUrl;
@@ -303,6 +305,7 @@ function bytesToBase64(bytes: Uint8Array) {
 
 	return btoa(binString);
 }
+
 const eventAttributes = [
 	"onbeforexrselect",
 	"onabort",
