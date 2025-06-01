@@ -106,24 +106,12 @@ export function unrewriteHtml(html: string) {
 	});
 }
 
-export const htmlRules: {
-	[key: string]: "*" | string[] | ((...any: any[]) => string | null);
-	fn: (value: string, meta: URLMeta, cookieStore: CookieStore) => string | null;
-}[] = [
+export const htmlRules = [
 	{
 		fn: (value: string, meta: URLMeta) => {
 			return rewriteUrl(value, meta);
 		},
-		src: [
-			"embed",
-			"script",
-			"img",
-			"iframe",
-			"frame",
-			"source",
-			"input",
-			"track",
-		],
+		src: ["embed", "script", "img", "iframe", "frame", "source", "input", "track"],
 		href: ["a", "link", "area", "image"],
 		data: ["object"],
 		action: ["form"],
@@ -136,7 +124,6 @@ export const htmlRules: {
 			if (value.startsWith("blob:")) {
 				return unrewriteBlob(value);
 			}
-
 			return rewriteUrl(value, meta);
 		},
 		src: ["video", "audio"],
@@ -182,11 +169,7 @@ export const htmlRules: {
 	},
 ];
 
-function traverseParsedHtml(
-	node: any,
-	cookieStore: CookieStore,
-	meta: URLMeta
-) {
+function traverseParsedHtml(node: any, cookieStore: CookieStore, meta: URLMeta) {
 	if (node.name === "base" && node.attribs.href !== undefined) {
 		meta.base = new URL(node.attribs.href, meta.origin);
 	}
@@ -201,11 +184,8 @@ function traverseParsedHtml(
 					if (node.attribs[attr] !== undefined) {
 						const value = node.attribs[attr];
 						const v = rule.fn(value, meta, cookieStore);
-
 						if (v === null) delete node.attribs[attr];
-						else {
-							node.attribs[attr] = v;
-						}
+						else node.attribs[attr] = v;
 						node.attribs[`scramjet-attr-${attr}`] = value;
 					}
 				}
@@ -214,11 +194,7 @@ function traverseParsedHtml(
 		for (const [attr, value] of Object.entries(node.attribs)) {
 			if (eventAttributes.includes(attr)) {
 				node.attribs[`scramjet-attr-${attr}`] = value;
-				node.attribs[attr] = rewriteJs(
-					value as string,
-					`(inline ${attr} on element)`,
-					meta
-				);
+				node.attribs[attr] = rewriteJs(value as string, `(inline ${attr} on element)`, meta);
 			}
 		}
 	}
@@ -235,49 +211,33 @@ function traverseParsedHtml(
 
 	if (
 		node.name === "script" &&
-		/(application|text)\/javascript|module|importmap|undefined/.test(
-			node.attribs.type
-		) &&
+		/(application|text)\/javascript|module|importmap|undefined/.test(node.attribs.type) &&
 		node.children[0] !== undefined
 	) {
 		let js = node.children[0].data;
 		const module = node.attribs.type === "module" ? true : false;
-		node.attribs["scramjet-attr-script-source-src"] = bytesToBase64(
-			encoder.encode(js)
-		);
+		node.attribs["scramjet-attr-script-source-src"] = bytesToBase64(encoder.encode(js));
 		const htmlcomment = /<!--[\s\S]*?-->/g;
 		js = js.replace(htmlcomment, "");
-		node.children[0].data = rewriteJs(
-			js,
-			"(inline script element)",
-			meta,
-			module
-		);
+		node.children[0].data = rewriteJs(js, "(inline script element)", meta, module);
 	}
 
 	if (node.name === "meta" && node.attribs["http-equiv"] !== undefined) {
-		if (
-			node.attribs["http-equiv"].toLowerCase() === "content-security-policy"
-		) {
+		if (node.attribs["http-equiv"].toLowerCase() === "content-security-policy") {
 			node = {};
 		} else if (
 			node.attribs["http-equiv"] === "refresh" &&
 			node.attribs.content.includes("url")
 		) {
 			const contentArray = node.attribs.content.split("url=");
-			if (contentArray[1])
-				contentArray[1] = rewriteUrl(contentArray[1].trim(), meta);
+			if (contentArray[1]) contentArray[1] = rewriteUrl(contentArray[1].trim(), meta);
 			node.attribs.content = contentArray.join("url=");
 		}
 	}
 
 	if (node.childNodes) {
 		for (const childNode in node.childNodes) {
-			node.childNodes[childNode] = traverseParsedHtml(
-				node.childNodes[childNode],
-				cookieStore,
-				meta
-			);
+			node.childNodes[childNode] = traverseParsedHtml(node.childNodes[childNode], cookieStore, meta);
 		}
 	}
 
@@ -289,122 +249,39 @@ export function rewriteSrcset(srcset: string, meta: URLMeta) {
 	const rewrittenSources = sources.map((source) => {
 		const [url, ...descriptors] = source.split(/\s+/);
 		const rewrittenUrl = rewriteUrl(url.trim(), meta);
-
 		return descriptors.length > 0
 			? `${rewrittenUrl} ${descriptors.join(" ")}`
 			: rewrittenUrl;
 	});
-
 	return rewrittenSources.join(", ");
 }
 
 function bytesToBase64(bytes: Uint8Array) {
-	const binString = Array.from(bytes, (byte) =>
-		String.fromCodePoint(byte)
-	).join("");
-
-	return btoa(binString);
+	let binary = "";
+	for (let i = 0; i < bytes.length; i++) {
+		binary += String.fromCharCode(bytes[i]);
+	}
+	return btoa(binary);
 }
 
 const eventAttributes = [
-	"onbeforexrselect",
-	"onabort",
-	"onbeforeinput",
-	"onbeforematch",
-	"onbeforetoggle",
-	"onblur",
-	"oncancel",
-	"oncanplay",
-	"oncanplaythrough",
-	"onchange",
-	"onclick",
-	"onclose",
-	"oncontentvisibilityautostatechange",
-	"oncontextlost",
-	"oncontextmenu",
-	"oncontextrestored",
-	"oncuechange",
-	"ondblclick",
-	"ondrag",
-	"ondragend",
-	"ondragenter",
-	"ondragleave",
-	"ondragover",
-	"ondragstart",
-	"ondrop",
-	"ondurationchange",
-	"onemptied",
-	"onended",
-	"onerror",
-	"onfocus",
-	"onformdata",
-	"oninput",
-	"oninvalid",
-	"onkeydown",
-	"onkeypress",
-	"onkeyup",
-	"onload",
-	"onloadeddata",
-	"onloadedmetadata",
-	"onloadstart",
-	"onmousedown",
-	"onmouseenter",
-	"onmouseleave",
-	"onmousemove",
-	"onmouseout",
-	"onmouseover",
-	"onmouseup",
-	"onmousewheel",
-	"onpause",
-	"onplay",
-	"onplaying",
-	"onprogress",
-	"onratechange",
-	"onreset",
-	"onresize",
-	"onscroll",
-	"onsecuritypolicyviolation",
-	"onseeked",
-	"onseeking",
-	"onselect",
-	"onslotchange",
-	"onstalled",
-	"onsubmit",
-	"onsuspend",
-	"ontimeupdate",
-	"ontoggle",
-	"onvolumechange",
-	"onwaiting",
-	"onwebkitanimationend",
-	"onwebkitanimationiteration",
-	"onwebkitanimationstart",
-	"onwebkittransitionend",
-	"onwheel",
-	"onauxclick",
-	"ongotpointercapture",
-	"onlostpointercapture",
-	"onpointerdown",
-	"onpointermove",
-	"onpointerrawupdate",
-	"onpointerup",
-	"onpointercancel",
-	"onpointerover",
-	"onpointerout",
-	"onpointerenter",
-	"onpointerleave",
-	"onselectstart",
-	"onselectionchange",
-	"onanimationend",
-	"onanimationiteration",
-	"onanimationstart",
-	"ontransitionrun",
-	"ontransitionstart",
-	"ontransitionend",
-	"ontransitioncancel",
-	"oncopy",
-	"oncut",
-	"onpaste",
-	"onscrollend",
-	"onscrollsnapchange",
-	"onscrollsnapchanging",
+	"onbeforexrselect", "onabort", "onbeforeinput", "onbeforematch", "onbeforetoggle", "onblur",
+	"oncancel", "oncanplay", "oncanplaythrough", "onchange", "onclick", "onclose",
+	"oncontentvisibilityautostatechange", "oncontextlost", "oncontextmenu", "oncontextrestored",
+	"oncuechange", "ondblclick", "ondrag", "ondragend", "ondragenter", "ondragleave",
+	"ondragover", "ondragstart", "ondrop", "ondurationchange", "onemptied", "onended",
+	"onerror", "onfocus", "onformdata", "oninput", "oninvalid", "onkeydown", "onkeypress",
+	"onkeyup", "onload", "onloadeddata", "onloadedmetadata", "onloadstart", "onmousedown",
+	"onmouseenter", "onmouseleave", "onmousemove", "onmouseout", "onmouseover", "onmouseup",
+	"onmousewheel", "onpause", "onplay", "onplaying", "onprogress", "onratechange", "onreset",
+	"onresize", "onscroll", "onsecuritypolicyviolation", "onseeked", "onseeking", "onselect",
+	"onslotchange", "onstalled", "onsubmit", "onsuspend", "ontimeupdate", "ontoggle",
+	"onvolumechange", "onwaiting", "onwebkitanimationend", "onwebkitanimationiteration",
+	"onwebkitanimationstart", "onwebkittransitionend", "onwheel", "onauxclick",
+	"ongotpointercapture", "onlostpointercapture", "onpointerdown", "onpointermove",
+	"onpointerrawupdate", "onpointerup", "onpointercancel", "onpointerover", "onpointerout",
+	"onpointerenter", "onpointerleave", "onselectstart", "onselectionchange", "onanimationend",
+	"onanimationiteration", "onanimationstart", "ontransitionrun", "ontransitionstart",
+	"ontransitionend", "ontransitioncancel", "oncopy", "oncut", "onpaste", "onscrollend",
+	"onscrollsnapchange", "onscrollsnapchanging"
 ];
