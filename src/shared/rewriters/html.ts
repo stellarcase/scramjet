@@ -65,8 +65,8 @@ export function rewriteHtml(
 	}
 
 	return render(handler.root, {
-		encodeEntities: "utf8",
-		decodeEntities: false,
+		decodeEntities: true,
+		encodeEntities: false
 	});
 }
 
@@ -108,7 +108,7 @@ export function unrewriteHtml(html: string) {
 	traverse(handler.root);
 
 	return render(handler.root, {
-		decodeEntities: false,
+		decodeEntities: true
 	});
 }
 
@@ -265,7 +265,7 @@ function traverseParsedHtml(
 		node.attribs["scramjet-attr-script-source-src"] = bytesToBase64(
 			encoder.encode(js)
 		);
-		const htmlcomment = /<!--[\s\S]*?-->/g;
+		const htmlcomment = //g;
 		js = js.replace(htmlcomment, "");
 		node.children[0].data = rewriteJs(
 			js,
