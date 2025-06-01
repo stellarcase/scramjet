@@ -53,7 +53,6 @@ export function rewriteHtml(
 
 		const script = (src) => new Element("script", { src });
 
-		// for compatibility purpose
 		const base64Injected = bytesToBase64(encoder.encode(injected));
 
 		head.children.unshift(
@@ -65,15 +64,10 @@ export function rewriteHtml(
 	}
 
 	return render(handler.root, {
-		decodeEntities: true,
-		encodeEntities: false
+		encodeEntities: "named",
+		decodeEntities: false,
 	});
 }
-
-// type ParseState = {
-// 	base: string;
-// 	origin?: URL;
-// };
 
 export function unrewriteHtml(html: string) {
 	const handler = new DomHandler((err, dom) => dom);
@@ -108,7 +102,7 @@ export function unrewriteHtml(html: string) {
 	traverse(handler.root);
 
 	return render(handler.root, {
-		decodeEntities: true
+		decodeEntities: false,
 	});
 }
 
@@ -120,8 +114,6 @@ export const htmlRules: {
 		fn: (value: string, meta: URLMeta) => {
 			return rewriteUrl(value, meta);
 		},
-
-		// url rewrites
 		src: [
 			"embed",
 			"script",
@@ -142,32 +134,24 @@ export const htmlRules: {
 	{
 		fn: (value: string, meta: URLMeta) => {
 			if (value.startsWith("blob:")) {
-				// for media elements specifically they must take the original blob
-				// because they can't be fetch'd
 				return unrewriteBlob(value);
 			}
-
 			return rewriteUrl(value, meta);
 		},
 		src: ["video", "audio"],
 	},
 	{
 		fn: () => "",
-
 		integrity: ["script", "link"],
 	},
 	{
 		fn: () => null,
-
-		// csp stuff that must be deleted
 		nonce: "*",
 		csp: ["iframe"],
 		credentialless: ["iframe"],
 	},
 	{
 		fn: (value: string, meta: URLMeta) => rewriteSrcset(value, meta),
-
-		// srcset
 		srcset: ["img", "source"],
 		imagesrcset: ["link"],
 	},
@@ -177,14 +161,11 @@ export const htmlRules: {
 				value,
 				cookieStore,
 				{
-					// for srcdoc origin is the origin of the page that the iframe is on. base and path get dropped
 					origin: new URL(meta.origin.origin),
 					base: new URL(meta.origin.origin),
 				},
 				true
 			),
-
-		// srcdoc
 		srcdoc: ["iframe"],
 	},
 	{
@@ -199,8 +180,6 @@ export const htmlRules: {
 		target: ["a", "base"],
 	},
 ];
-
-// i need to add the attributes in during rewriting
 
 function traverseParsedHtml(
 	node: any,
@@ -265,7 +244,7 @@ function traverseParsedHtml(
 		node.attribs["scramjet-attr-script-source-src"] = bytesToBase64(
 			encoder.encode(js)
 		);
-		const htmlcomment = //g;
+		const htmlcomment = /<!--[\s\S]*?-->/g;
 		js = js.replace(htmlcomment, "");
 		node.children[0].data = rewriteJs(
 			js,
@@ -307,13 +286,8 @@ function traverseParsedHtml(
 export function rewriteSrcset(srcset: string, meta: URLMeta) {
 	const sources = srcset.split(",").map((src) => src.trim());
 	const rewrittenSources = sources.map((source) => {
-		// Split into URLs and descriptors (if any)
-		// e.g. url0, url1 1.5x, url2 2x
 		const [url, ...descriptors] = source.split(/\s+/);
-
-		// Rewrite the URLs and keep the descriptors (if any)
 		const rewrittenUrl = rewriteUrl(url.trim(), meta);
-
 		return descriptors.length > 0
 			? `${rewrittenUrl} ${descriptors.join(" ")}`
 			: rewrittenUrl;
@@ -321,12 +295,6 @@ export function rewriteSrcset(srcset: string, meta: URLMeta) {
 
 	return rewrittenSources.join(", ");
 }
-
-// function base64ToBytes(base64) {
-// 	const binString = atob(base64);
-
-// 	return Uint8Array.from(binString, (m) => m.codePointAt(0));
-// }
 
 function bytesToBase64(bytes: Uint8Array) {
 	const binString = Array.from(bytes, (byte) =>
